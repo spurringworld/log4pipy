@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -12,17 +13,36 @@ import (
 )
 
 type Logs struct {
-	Message string
+	Message   string
+	ReqTime   uint64
+	ResTime   uint64
+	ReqPath   string
+	ResStatus uint
+}
+
+type Message struct {
+	Req struct {
+		// Protocol string
+		// Method   string
+		Path string
+	} `json:"req"`
+	// ReqSize uint
+	// ResSize uint
+	Res struct {
+		Status uint
+	} `json:"res"`
+	ReqTime uint64
+	ResTime uint64
 }
 
 func main() {
 	// welcome message
 	fmt.Println(`
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  Pipy pg-logger is running
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            log4pipy is running    
+        ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 	`)
-	//load ENV
+	// load ENV
 	err := godotenv.Load()
 	if err != nil {
 		fmt.Println("Error loading .env file")
@@ -33,27 +53,28 @@ func main() {
 	dbPasswd := os.Getenv("DB_PASSWD")
 	dbName := os.Getenv("DB_NAME")
 	svcListen := os.Getenv("SERVER_LISTENING")
-	// gin-web
-	gin.SetMode(gin.ReleaseMode)
-	r := gin.Default()
-	//db connect
-	var pgsqlDB = pg.Connect(&pg.Options{
+	// db connect
+	var pgDB = pg.Connect(&pg.Options{
 		Addr:     dbAddr,
 		User:     dbUser,
 		Password: dbPasswd,
 		Database: dbName,
 	})
-	if pgsqlDB == nil {
+	if pgDB == nil {
 		fmt.Println("error: pg.Connect() failed.")
 		return
 	}
-	//db close
+	// db close
 	defer func(pgsqlDB *pg.DB) {
 		err := pgsqlDB.Close()
 		if err != nil {
-			fmt.Println("err: close postgresql failed.")
+			fmt.Println("error: close postgresql failed.")
 		}
-	}(pgsqlDB)
+	}(pgDB)
+
+	// init gin-web
+	gin.SetMode(gin.ReleaseMode)
+	r := gin.Default()
 
 	// save logs func
 	r.POST("/logs", func(c *gin.Context) {
@@ -62,20 +83,28 @@ func main() {
 		body, err := ioutil.ReadAll(c.Request.Body)
 		if err != nil {
 			fmt.Println("Invalid request body")
+			c.JSON(406, gin.H{
+				"error": "Invalid request body.",
+			})
 		}
 		// fmt.Println("【body】:  " + string(body))
 		messages := strings.Split(string(body), "\n")
 
 		var logList []Logs
 		for _, v := range messages {
-			// msg := json.NewDecoder(strings.NewReader(v))
+			var msg Message
+			json.Unmarshal([]byte(v), &msg)
 			pipyLog := Logs{
-				Message: v,
+				Message:   v,
+				ReqTime:   msg.ReqTime,
+				ResTime:   msg.ResTime,
+				ReqPath:   msg.Req.Path,
+				ResStatus: msg.Res.Status,
 			}
 			logList = append(logList, pipyLog)
 		}
 
-		result, err := pgsqlDB.Model(&logList).Insert()
+		result, err := pgDB.Model(&logList).Insert()
 		if err != nil {
 			fmt.Println("batch insert rows error: ", err)
 		} else {
@@ -87,5 +116,6 @@ func main() {
 		})
 	})
 
+	// gin-web server run
 	r.Run(svcListen)
 }

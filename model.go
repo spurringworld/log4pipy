@@ -11,7 +11,7 @@ type Trafficlogs struct {
 	ReqMethod   string `sql:"req_method"`
 	ResStatus   int    `sql:"res_status"`
 	RemoteAddr  string `sql:"remote_addr"`
-	RemotePort  int    `sql:"remote_nort"`
+	RemotePort  int    `sql:"remote_port"`
 	LocalAddr   string `sql:"local_addr"`
 	LocalPort   int    `sql:"local_port"`
 	BondType    string `sql:"bond_type"`

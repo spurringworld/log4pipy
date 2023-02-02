@@ -12,29 +12,6 @@ import (
 	"github.com/joho/godotenv"
 )
 
-type Logs struct {
-	Message   string
-	ReqTime   uint64
-	ResTime   uint64
-	ReqPath   string
-	ResStatus uint
-}
-
-type Message struct {
-	Req struct {
-		// Protocol string
-		// Method   string
-		Path string
-	} `json:"req"`
-	// ReqSize uint
-	// ResSize uint
-	Res struct {
-		Status uint
-	} `json:"res"`
-	ReqTime uint64
-	ResTime uint64
-}
-
 func main() {
 	// welcome message
 	fmt.Println(`
@@ -89,31 +66,43 @@ func main() {
 		}
 		// fmt.Println("【body】:  " + string(body))
 		messages := strings.Split(string(body), "\n")
-
-		var logList []Logs
+		var logList []Trafficlogs
 		for _, v := range messages {
 			var msg Message
 			json.Unmarshal([]byte(v), &msg)
-			pipyLog := Logs{
-				Message:   v,
-				ReqTime:   msg.ReqTime,
-				ResTime:   msg.ResTime,
-				ReqPath:   msg.Req.Path,
-				ResStatus: msg.Res.Status,
+			pipyLog := Trafficlogs{
+				Message:     v,
+				ReqSize:     msg.ReqSize,
+				ResSize:     msg.ResSize,
+				ReqTime:     msg.ReqTime,
+				ResTime:     msg.ResTime,
+				EndTime:     msg.EndTime,
+				RemoteAddr:  msg.RemoteAddr,
+				LocalAddr:   msg.LocalAddr,
+				RemotePort:  msg.RemotePort,
+				LocalPort:   msg.LocalPort,
+				ReqPath:     msg.Req.Path,
+				ReqMethod:   msg.Req.Method,
+				ResStatus:   msg.Res.Status,
+				ServiceName: msg.Service.Name,
+				MeshName:    msg.MeshName,
+				ClusterName: msg.ClusterName,
+				BondType:    msg.Type,
 			}
 			logList = append(logList, pipyLog)
 		}
-
 		result, err := pgDB.Model(&logList).Insert()
 		if err != nil {
 			fmt.Println("batch insert rows error: ", err)
+			c.JSON(500, gin.H{
+				"error": err.Error(),
+			})
 		} else {
 			fmt.Printf("batch insert rows affected: %d\n", result.RowsAffected())
+			c.JSON(200, gin.H{
+				"message": "success.",
+			})
 		}
-
-		c.JSON(200, gin.H{
-			"message": "success.",
-		})
 	})
 
 	// gin-web server run

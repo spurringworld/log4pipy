@@ -1,24 +1,24 @@
 package main
 
-type Trafficlogs struct {
-	Message string `sql:"message"`
+import "time"
 
-	// ReqSize     int    `sql:"reqSize"`
-	// ResSize     int    `sql:"resSize"`
-	// ReqTime     int64  `sql:"reqTime"`
-	// ResTime     int64  `sql:"resTime"`
-	// EndTime     int64  `sql:"endTime"`
-	// ReqPath     string `sql:"reqPath"`
-	// ReqMethod   string `sql:"reqMethod"`
-	// ResStatus   int    `sql:"resStatus"`
-	// RemoteAddr  string `sql:"remoteAddr"`
-	// RemotePort  int    `sql:"remotePort"`
-	// LocalAddr   string `sql:"localAddr"`
-	// LocalPort   int    `sql:"localPort"`
-	// BondType    string `sql:"bondType"`
-	// ServiceName string `sql:"serviceName"`
-	// MeshName    string `sql:"meshName"`
-	// ClusterName string `sql:"clusterName"`
+type Trafficlogs struct {
+	ServiceName string
+	PodName     string
+	ReqPath     string
+	ReqMethod   string
+	ReqProtocol string
+	ResTime     uint64
+	ReqTime     uint64
+	ResStatus   uint32
+	ResSize     uint64
+	RemoteAddr  string
+	RemotePort  uint32
+	LocalAddr   string
+	LocalPort   uint32
+	Timestamp   time.Time
+	ReqHeaders  string
+	Message     string
 }
 
 type Message struct {
@@ -62,11 +62,20 @@ type Message struct {
 }
 
 type LogForm struct {
-	ReqTimeStart int64  `json:"reqTimeStart"`
-	ReqTimeEnd   int64  `json:"reqTimeEnd"`
+	ReqTimeFrom  int64  `json:"reqTimeFrom"`
+	ReqTimeTo    int64  `json:"reqTimeTo"`
 	OrderByField string `json:"orderByField"`
 	OrderByType  string `json:"orderByType"`
 	CustomQuery  string `json:"customQuery"`
 	LimitSize    int    `json:"limitSize"`
 	LimitStart   int    `json:"limitStart"`
+}
+
+type SvcLogForm struct {
+	ReqTimeFrom string `json:"reqTimeFrom"`
+	ReqTimeTo   string `json:"reqTimeTo"`
+	ServiceName string `json:"serviceName"`
+	QueryWords  string `json:"queryWords"`
+	LimitSize   int    `json:"limitSize"`
+	LimitStart  int    `json:"limitStart"`
 }

@@ -105,13 +105,13 @@ func main() {
 		if len(customQuery) > 0 {
 			baseSql += fmt.Sprintf(" AND (%s) ", customQuery)
 		}
-		reqTimeStart := logForm.ReqTimeStart
-		if reqTimeStart > 0 {
-			baseSql += fmt.Sprintf(" AND ReqTime > %d ", reqTimeStart)
+		reqTimeFrom := logForm.ReqTimeFrom
+		if reqTimeFrom > 0 {
+			baseSql += fmt.Sprintf(" AND ReqTime > %d ", reqTimeFrom)
 		}
-		reqTimeEnd := logForm.ReqTimeEnd
-		if reqTimeEnd > 0 {
-			baseSql += fmt.Sprintf(" AND ReqTime < %d ", reqTimeEnd)
+		reqTimeTo := logForm.ReqTimeTo
+		if reqTimeTo > 0 {
+			baseSql += fmt.Sprintf(" AND ReqTime < %d ", reqTimeTo)
 		}
 		// get total
 		var total uint64
@@ -140,24 +140,7 @@ func main() {
 		}
 		querySql := baseSql + fmt.Sprintf(" ORDER BY %s %s LIMIT %d, %d", orderByField, orderByType, limitStart, limitSize)
 		// fmt.Println(querySql)
-		var result []struct {
-			ServiceName string
-			PodName     string
-			ReqPath     string
-			ReqMethod   string
-			ReqProtocol string
-			ResTime     uint64
-			ReqTime     uint64
-			ResStatus   uint32
-			ResSize     uint64
-			RemoteAddr  string
-			RemotePort  uint32
-			LocalAddr   string
-			LocalPort   uint32
-			Timestamp   time.Time
-			ReqHeaders  string
-			Message     string
-		}
+		var result []Trafficlogs
 		if err := conn.Select(c, &result, querySql); err != nil {
 			fmt.Println("error: ", err)
 		}
@@ -168,6 +151,106 @@ func main() {
 		})
 	})
 
+	///////////////////////
+	// query service logs func
+	///////////////////////
+	r.POST("/querysvclogs", func(c *gin.Context) {
+		var logForm SvcLogForm
+		if err := c.ShouldBindJSON(&logForm); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		baseSql := `
+		SELECT service.name as ServiceName, pod.name as PodName, 
+			req.path as ReqPath, req.method as ReqMethod, req.protocol as ReqProtocol,
+			resTime as ResTime, reqTime as ReqTime, res.status as ResStatus, resSize as ResSize,
+			remoteAddr as RemoteAddr, remotePort as RemotePort, localAddr as LocalAddr, localPort as LocalPort,
+			timestamp as Timestamp, req.headers as ReqHeaders, message as Message
+		FROM log
+		WHERE  bondType != 'outbound'
+		`
+		var whereSql = buildWhereSql(logForm)
+		baseSql += whereSql
+
+		// get total
+		var total uint64
+		countSql := fmt.Sprintf("SELECT count(1) AS total FROM (%s)", baseSql)
+		row := conn.QueryRow(c, countSql)
+		if err := row.Scan(&total); err != nil {
+			fmt.Println("error: ", err)
+		}
+		// get data
+		limitStart := 0
+		if logForm.LimitStart > 0 {
+			limitStart = logForm.LimitStart
+		}
+		limitSize := 10
+		if logForm.LimitSize > 0 {
+			limitSize = logForm.LimitSize
+		}
+		querySql := baseSql + fmt.Sprintf(" ORDER BY Timestamp desc LIMIT %d, %d", limitStart, limitSize)
+		var result []Trafficlogs
+		if err := conn.Select(c, &result, querySql); err != nil {
+			fmt.Println("error: ", err)
+		}
+		c.JSON(200, gin.H{
+			"statusText": "success",
+			"data":       result,
+			"total":      total,
+		})
+	})
+
+	///////////////////////
+	// chart4latency func
+	///////////////////////
+	r.POST("/chart4latency", func(c *gin.Context) {
+		var logForm SvcLogForm
+		if err := c.ShouldBindJSON(&logForm); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		baseSql := `
+		SELECT (CEIL ((resTime - reqTime)/ 1000)) AS Latency, COUNT(1) as Count
+		FROM log
+		WHERE bondType != 'outbound'
+		`
+		var whereSql = buildWhereSql(logForm)
+		querySql := baseSql + whereSql + " GROUP BY Latency ORDER BY Latency"
+		// fmt.Println(querySql)
+		var result []struct {
+			Latency float64
+			Count   uint64
+		}
+		if err := conn.Select(c, &result, querySql); err != nil {
+			fmt.Println("error: ", err)
+		}
+		c.JSON(200, gin.H{
+			"statusText": "success",
+			"data":       result,
+		})
+	})
+
 	// gin-web server run
 	r.Run(svcListen)
+}
+
+func buildWhereSql(logForm SvcLogForm) string {
+	var whereSql string
+	svcName := logForm.ServiceName
+	if len(svcName) > 0 {
+		whereSql = fmt.Sprintf(" AND service.name = '%s' ", svcName)
+	}
+	queryWords := logForm.QueryWords
+	if len(queryWords) > 0 {
+		whereSql = whereSql + " AND message like '%" + queryWords + "%' "
+	}
+	reqTimeFrom := logForm.ReqTimeFrom //e.g. reqTimeFrom=15 day
+	if len(reqTimeFrom) > 0 {
+		whereSql += fmt.Sprintf(" AND toDateTime(reqTime / 1000) > now() - interval %s ", reqTimeFrom)
+	}
+	reqTimeTo := logForm.ReqTimeTo //e.g. reqTimeTo=1 second
+	if len(reqTimeTo) > 0 {
+		whereSql += fmt.Sprintf(" AND toDateTime(reqTime / 1000) < now() - interval %s ", reqTimeTo)
+	}
+	return whereSql
 }

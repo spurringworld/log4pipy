@@ -75,7 +75,7 @@ func main() {
 		for _, v := range messages {
 			err := batch.Append(v)
 			if err != nil {
-				c.JSON(500, gin.H{"error": err.Error()})
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 				return
 			}
 		}
@@ -142,7 +142,8 @@ func main() {
 		// fmt.Println(querySql)
 		var result []Trafficlogs
 		if err := conn.Select(c, &result, querySql); err != nil {
-			fmt.Println("error: ", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
 		}
 		c.JSON(200, gin.H{
 			"statusText": "success",
@@ -177,7 +178,8 @@ func main() {
 		countSql := fmt.Sprintf("SELECT count(1) AS total FROM (%s)", baseSql)
 		row := conn.QueryRow(c, countSql)
 		if err := row.Scan(&total); err != nil {
-			fmt.Println("error: ", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
 		}
 		// get data
 		limitStart := 0
@@ -191,7 +193,8 @@ func main() {
 		querySql := baseSql + fmt.Sprintf(" ORDER BY Timestamp desc LIMIT %d, %d", limitStart, limitSize)
 		var result []Trafficlogs
 		if err := conn.Select(c, &result, querySql); err != nil {
-			fmt.Println("error: ", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
 		}
 		c.JSON(200, gin.H{
 			"statusText": "success",
@@ -201,16 +204,16 @@ func main() {
 	})
 
 	///////////////////////
-	// chart4latency func
+	// countlatency func
 	///////////////////////
-	r.POST("/chart4latency", func(c *gin.Context) {
+	r.POST("/countlatency", func(c *gin.Context) {
 		var logForm SvcLogForm
 		if err := c.ShouldBindJSON(&logForm); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
 		baseSql := `
-		SELECT (CEIL ((resTime - reqTime)/ 1000)) AS Latency, COUNT(1) as Count
+		SELECT (CEIL ((resTime - reqTime)/ 500000)) AS Latency, COUNT(1) as Count
 		FROM log
 		WHERE bondType != 'outbound'
 		`
@@ -222,7 +225,8 @@ func main() {
 			Count   uint64
 		}
 		if err := conn.Select(c, &result, querySql); err != nil {
-			fmt.Println("error: ", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
 		}
 		c.JSON(200, gin.H{
 			"statusText": "success",
@@ -230,10 +234,106 @@ func main() {
 		})
 	})
 
+	///////////////////////
+	// countstatus func
+	///////////////////////
+	r.POST("/countstatus", func(c *gin.Context) {
+		var logForm SvcLogForm
+		if err := c.ShouldBindJSON(&logForm); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		baseSql := `
+		SELECT COUNT(1) AS Count, res.status Status
+		FROM log
+		WHERE bondType != 'outbound'
+		`
+		var whereSql = buildWhereSql(logForm)
+		querySql := baseSql + whereSql + " AND Status > '0' GROUP BY Status ORDER BY Status "
+		// fmt.Println(querySql)
+		var result []struct {
+			Status uint32
+			Count  uint64
+		}
+		if err := conn.Select(c, &result, querySql); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(200, gin.H{
+			"statusText": "success",
+			"data":       result,
+		})
+	})
+
+	///////////////////////
+	// counttps func
+	///////////////////////
+	r.POST("/counttps", func(c *gin.Context) {
+		var logForm SvcLogForm
+		if err := c.ShouldBindJSON(&logForm); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		baseSql := `
+		SELECT COUNT(1) AS Tps,
+			toStartOfInterval(toDateTime(resTime / 1000), interval 1 minute) as Minute
+		FROM log
+		WHERE bondType != 'outbound'
+		`
+		var whereSql = buildWhereSql(logForm)
+		querySql := baseSql + whereSql + " GROUP BY Minute ORDER BY Minute ASC "
+		// fmt.Println(querySql)
+		var result []struct {
+			Tps    uint64
+			Minute time.Time
+		}
+		if err := conn.Select(c, &result, querySql); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(200, gin.H{
+			"statusText": "success",
+			"data":       result,
+		})
+	})
+
+	///////////////////////
+	// totaltps func
+	///////////////////////
+	r.POST("/totaltps", func(c *gin.Context) {
+		var logForm SvcLogForm
+		if err := c.ShouldBindJSON(&logForm); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		baseSql := `
+		SELECT COUNT(1) AS TotalTps
+		FROM log
+		WHERE bondType != 'outbound'
+		`
+		var whereSql = buildWhereSql(logForm)
+		var total uint64
+		countSql := baseSql + whereSql
+		// fmt.Println(countSql)
+		row := conn.QueryRow(c, countSql)
+		if err := row.Scan(&total); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		c.JSON(200, gin.H{
+			"statusText": "success",
+			"TotalTps":   total,
+		})
+	})
+
 	// gin-web server run
 	r.Run(svcListen)
 }
 
+//////////////////////////////
+// common method buildWhereSql
+//////////////////////////////
 func buildWhereSql(logForm SvcLogForm) string {
 	var whereSql string
 	svcName := logForm.ServiceName

@@ -97,7 +97,7 @@ func main() {
 			req.path as ReqPath, req.method as ReqMethod, req.protocol as ReqProtocol,
 			resTime as ResTime, reqTime as ReqTime, res.status as ResStatus, resSize as ResSize,
 			remoteAddr as RemoteAddr, remotePort as RemotePort, localAddr as LocalAddr, localPort as LocalPort,
-			timestamp as Timestamp, req.headers as ReqHeaders, message as Message
+			timestamp as CreatedAt, req.headers as ReqHeaders, message as Message
 		FROM log
 		WHERE  bondType != 'outbound'
 		`
@@ -140,7 +140,7 @@ func main() {
 		}
 		querySql := baseSql + fmt.Sprintf(" ORDER BY %s %s LIMIT %d, %d", orderByField, orderByType, limitStart, limitSize)
 		// fmt.Println(querySql)
-		var result []Trafficlogs
+		var result []LogVO
 		if err := conn.Select(c, &result, querySql); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
@@ -166,7 +166,7 @@ func main() {
 			req.path as ReqPath, req.method as ReqMethod, req.protocol as ReqProtocol,
 			resTime as ResTime, reqTime as ReqTime, res.status as ResStatus, resSize as ResSize,
 			remoteAddr as RemoteAddr, remotePort as RemotePort, localAddr as LocalAddr, localPort as LocalPort,
-			timestamp as Timestamp, req.headers as ReqHeaders, message as Message
+			timestamp as CreatedAt, req.headers as ReqHeaders, message as Message
 		FROM log
 		WHERE  bondType != 'outbound'
 		`
@@ -190,8 +190,8 @@ func main() {
 		if logForm.LimitSize > 0 {
 			limitSize = logForm.LimitSize
 		}
-		querySql := baseSql + fmt.Sprintf(" ORDER BY Timestamp desc LIMIT %d, %d", limitStart, limitSize)
-		var result []Trafficlogs
+		querySql := baseSql + fmt.Sprintf(" ORDER BY CreatedAt desc LIMIT %d, %d", limitStart, limitSize)
+		var result []LogVO
 		if err := conn.Select(c, &result, querySql); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return

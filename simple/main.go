@@ -37,12 +37,20 @@ func main() {
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.Default()
 	//db connect
-	var pgsqlDB = pg.Connect(&pg.Options{
-		Addr:     dbAddr,
-		User:     dbUser,
-		Password: dbPasswd,
-		Database: dbName,
-	})
+	pgUrl := fmt.Sprintf("postgres://%s:%s@%s/%s?sslmode=prefer", dbUser, dbPasswd, dbAddr, dbName)
+	opt, err := pg.ParseURL(pgUrl)
+	// opt.RawQuery = "sslmode=verify-ca;sslrootcert=ca.pem"
+	if err != nil {
+		panic(err)
+	}
+	var pgsqlDB = pg.Connect(opt)
+
+	// var pgsqlDB = pg.Connect(&pg.Options{
+	// 	Addr:     dbAddr,
+	// 	User:     dbUser,
+	// 	Password: dbPasswd,
+	// 	Database: dbName,
+	// })
 	if pgsqlDB == nil {
 		fmt.Println("error: pg.Connect() failed.")
 		return

@@ -60,6 +60,14 @@ func main() {
 	// save logs func
 	///////////////////////
 	r.POST("/logs", func(c *gin.Context) {
+		tableName := c.Query("table")
+		if tableName == "" {
+			tableName = "log"
+			fmt.Println(tableName)
+		} else {
+			fmt.Println(tableName)
+		}
+
 		body, err := ioutil.ReadAll(c.Request.Body)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -67,7 +75,7 @@ func main() {
 		}
 		// fmt.Println("【body】:  " + string(body))
 		messages := strings.Split(string(body), "\n")
-		batch, err := conn.PrepareBatch(c, "INSERT INTO log (message)")
+		batch, err := conn.PrepareBatch(c, fmt.Sprintf("INSERT INTO %s (message)", tableName))
 		if err != nil {
 			c.JSON(500, gin.H{"error": err.Error()})
 			return

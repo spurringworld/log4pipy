@@ -63,11 +63,7 @@ func main() {
 		tableName := c.Query("table")
 		if tableName == "" {
 			tableName = "log"
-			fmt.Println(tableName)
-		} else {
-			fmt.Println(tableName)
 		}
-
 		body, err := ioutil.ReadAll(c.Request.Body)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})

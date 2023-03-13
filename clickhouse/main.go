@@ -83,8 +83,68 @@ func main() {
 				return
 			}
 		}
-		batch.Send()
+		error3 := batch.Send()
+		if error3 != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": error3.Error()})
+			return
+		}
 		c.JSON(200, gin.H{"statusText": "success"})
+	})
+
+	///////////////////////
+	// to ping func
+	///////////////////////
+	r.GET("/logs", func(c *gin.Context) {
+		baseSql := "SELECT NOW()"
+		var result time.Time
+		row := conn.QueryRow(c, baseSql)
+		if err := row.Scan(&result); err != nil {
+			fmt.Println("error: ", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(200, gin.H{
+			"statusText": "success",
+			"data":       result,
+		})
+	})
+
+	///////////////////////
+	// query logs func（for test）
+	///////////////////////
+	r.GET("/querylogs", func(c *gin.Context) {
+		tableName := c.Query("table")
+		if tableName == "" {
+			tableName = "log"
+		}
+		baseSql := fmt.Sprintf(`
+		SELECT service.name as ServiceName, pod.name as PodName, 
+			req.path as ReqPath, req.method as ReqMethod, req.protocol as ReqProtocol,
+			resTime as ResTime, reqTime as ReqTime, res.status as ResStatus, resSize as ResSize,
+			remoteAddr as RemoteAddr, remotePort as RemotePort, localAddr as LocalAddr, localPort as LocalPort,
+			timestamp as CreatedAt, req.headers as ReqHeaders, message as Message
+		FROM %s
+		WHERE  bondType != 'outbound'
+		`, tableName)
+		// get total
+		var total uint64
+		countSql := fmt.Sprintf("SELECT count(1) AS total FROM (%s)", baseSql)
+		row := conn.QueryRow(c, countSql)
+		if err := row.Scan(&total); err != nil {
+			fmt.Println("error: ", err)
+		}
+		// get data
+		querySql := baseSql + fmt.Sprintf(" LIMIT %d, %d", 0, 1)
+		var result []LogVO
+		if err := conn.Select(c, &result, querySql); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(200, gin.H{
+			"statusText": "success",
+			"data":       result,
+			"total":      total,
+		})
 	})
 
 	///////////////////////

@@ -1,4 +1,4 @@
-FROM golang:alpine AS build-env
+FROM golang:1.18.3 AS build-env
 MAINTAINER leon "lqhome@126.com"
 # docker中的工作目录
 WORKDIR /app

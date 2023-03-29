@@ -1,0 +1,57 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: flomesh
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: log4pipy
+    project: poc
+  name: log4pipy
+  namespace: flomesh
+spec:
+  ports:
+  - name: app
+    nodePort: 19876
+    port: 9876
+    protocol: TCP
+    targetPort: 9876
+  selector:
+    app: log4pipy
+    project: poc
+  type: NodePort
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: log4pipy
+  namespace: flomesh
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      project: poc
+      app: log4pipy
+  template:
+    metadata:
+      labels:
+        project: poc
+        app: log4pipy
+    spec:
+      containers:
+      - name: log4pipy
+        image: spurringworld/log4pipy-clickhouse:v1.0
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: SERVER_LISTENING
+          value: "0.0.0.0:9876"
+        - name: DB_SERVER
+          value: "192.168.31.121:9000"
+        - name: DB_USER
+          value: "default"
+        - name: DB_PASSWD
+          value: ""
+        - name: DB_NAME
+          value: "default"

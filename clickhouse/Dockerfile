@@ -8,7 +8,7 @@ COPY . /app
 ENV GO111MODULE=on
 ENV GOPROXY="https://goproxy.io"
 # 指定编译完成后的文件名，可以不设置使用默认的，最后一步要执行该文件名
-RUN cd /app && go build -o log4pipy
+RUN cd /app && CGO_ENABLED=0 go build -o log4pipy
 
 FROM alpine
 RUN apk --no-cache add ca-certificates

@@ -23,8 +23,8 @@ func main() {
 	// load ENV
 	err := godotenv.Load()
 	if err != nil {
-		fmt.Println("Error loading .env file")
-		return
+		fmt.Println(".env file is missed")
+		// return
 	}
 	dbServer := os.Getenv("DB_SERVER")
 	dbUser := os.Getenv("DB_USER")

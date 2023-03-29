@@ -14,7 +14,7 @@ metadata:
 spec:
   ports:
   - name: app
-    nodePort: 19876
+    nodePort: 30876
     port: 9876
     protocol: TCP
     targetPort: 9876
@@ -42,16 +42,16 @@ spec:
     spec:
       containers:
       - name: log4pipy
-        image: spurringworld/log4pipy-clickhouse:v1.0
+        image: spurringworld/log4pipy-clickhouse:1.0.1
         imagePullPolicy: IfNotPresent
         env:
         - name: SERVER_LISTENING
           value: "0.0.0.0:9876"
         - name: DB_SERVER
-          value: "192.168.31.121:9000"
+          value: "10.9.0.13:30099"
         - name: DB_USER
           value: "default"
         - name: DB_PASSWD
-          value: ""
+          value: "qwer1234"
         - name: DB_NAME
           value: "default"

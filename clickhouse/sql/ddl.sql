@@ -199,7 +199,8 @@ CREATE TABLE default.log
 
     `message` String,
 
-    `userAgent` String
+    `userAgent` String DEFAULT JSONExtractString(req.headers,
+ 'user-agent')
 )
 ENGINE = MergeTree
 PARTITION BY (toYYYYMM(toDateTime(reqTime / 1000)))
